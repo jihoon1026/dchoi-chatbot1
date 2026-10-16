@@ -1,9 +1,21 @@
-// 엑셀에서 만든 지식(data/knowledge.json)을 챗봇이 읽기 좋은 글로 바꿉니다.
-import knowledge from "@/data/knowledge.json";
+// 챗봇의 지식 = GitHub에 올라간 엑셀 파일(data/jeonjip.xlsx).
+// 엑셀을 읽어 상품 목록과 질의응답을 꺼내고, 관리자가 질의응답을 고치면 엑셀에 다시 저장합니다.
+import bundled from "@/data/knowledge.json";
+import { readWorkbook, writeWorkbook } from "./excel";
+import { readFile, storageKind, updateFile } from "./storage";
 import type { Product, QAItem } from "./types";
 
-export const products = knowledge.products as Product[];
-export const excelQA = knowledge.qa as QAItem[];
+export const EXCEL_PATH = "data/jeonjip.xlsx";
+const CACHE_MS = 60_000; // 1분마다 GitHub의 엑셀을 다시 확인
+
+export interface Knowledge {
+  products: Product[];
+  qa: QAItem[];
+  catalog: string;
+  source: "github" | "local" | "bundled";
+}
+
+let cache: { at: number; k: Knowledge } | null = null;
 
 const usd = (n: number | null) => (n == null ? "-" : `$${n.toFixed(2)}`);
 
@@ -22,8 +34,49 @@ function productBlock(p: Product, i: number): string {
   return lines.filter(Boolean).join("\n");
 }
 
-/** 상품 목록 전체 글. 엑셀이 바뀌어 다시 배포되기 전까지 똑같아서 프롬프트 캐시가 잘 됩니다. */
-export const catalogText = `[전집 상품 목록] (dchoi09.com 전집 카테고리, 총 ${products.length}개)\n\n${products.map(productBlock).join("\n\n")}`;
+/** 상품 목록 전체 글. 엑셀이 바뀌기 전까지 똑같아서 프롬프트 캐시가 잘 됩니다. */
+function catalogText(products: Product[]) {
+  return `[전집 상품 목록] (dchoi09.com 전집 카테고리, 총 ${products.length}개)\n\n${products.map(productBlock).join("\n\n")}`;
+}
+
+function build(products: Product[], qa: QAItem[], source: Knowledge["source"]): Knowledge {
+  return { products, qa, catalog: catalogText(products), source };
+}
+
+export async function getKnowledge(): Promise<Knowledge> {
+  if (cache && Date.now() - cache.at < CACHE_MS) return cache.k;
+  let k: Knowledge;
+  try {
+    const file = await readFile(EXCEL_PATH);
+    if (!file) throw new Error("엑셀 파일 없음");
+    const { products, qa } = await readWorkbook(file.data);
+    k = build(products, qa, storageKind === "github" ? "github" : "local");
+  } catch (e) {
+    console.error("[knowledge] 엑셀을 읽지 못해 내장 데이터로 대신합니다:", e);
+    k = cache?.k ?? build(bundled.products as Product[], bundled.qa as QAItem[], "bundled");
+  }
+  cache = { at: Date.now(), k };
+  return k;
+}
+
+/** 질의응답 목록을 엑셀(질의응답 시트)에 저장합니다. 상품 시트는 그대로 둡니다. */
+export async function saveQAToExcel(qa: QAItem[], message: string) {
+  let products: Product[] = [];
+  await updateFile(EXCEL_PATH, message, async (current) => {
+    products = current ? (await readWorkbook(current)).products : (bundled.products as Product[]);
+    return writeWorkbook(products, qa);
+  });
+  cache = { at: Date.now(), k: build(products, qa, cache?.k.source ?? "local") };
+}
+
+/** 엑셀 파일 전체를 새 파일로 바꿉니다 (관리자 "엑셀 올리기"). */
+export async function replaceExcel(buf: Buffer) {
+  const { products, qa } = await readWorkbook(buf);
+  if (!products.length) throw new Error("'전집상품' 시트에서 상품을 찾지 못했어요.");
+  await updateFile(EXCEL_PATH, "관리자: 엑셀 파일 교체", () => buf);
+  cache = { at: Date.now(), k: build(products, qa, cache?.k.source ?? "local") };
+  return { products: products.length, qa: qa.length };
+}
 
 export function qaText(qa: QAItem[]): string {
   if (!qa.length) return "[질의응답]\n(등록된 항목 없음)";

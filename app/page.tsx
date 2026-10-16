@@ -33,7 +33,7 @@ export default function ChatPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="entry muted">불러오는 중…</div>;
+  if (loading) return <div className="caption" style={{ padding: 40, textAlign: "center" }}>Loading…</div>;
   if (!me)
     return (
       <Entry
@@ -73,6 +73,14 @@ function Entry({ onEnter, notice }: { onEnter: (d: { user: Me; blockedText?: str
   const [agree, setAgree] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [images, setImages] = useState<{ src: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/showcase")
+      .then((r) => r.json())
+      .then((d) => setImages(d.images ?? []))
+      .catch(() => {});
+  }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -91,46 +99,62 @@ function Entry({ onEnter, notice }: { onEnter: (d: { user: Me; blockedText?: str
   }
 
   return (
-    <main className="entry">
-      <form className="entry-card" onSubmit={submit}>
-        <div className="avatar" aria-hidden>
-          D
+    <main className="entry-page">
+      <nav className="top-nav">
+        <span className="nav-left caption">Book Concierge</span>
+        <span className="wordmark">DCHOI09</span>
+        <span className="nav-right caption">전집 상담</span>
+      </nav>
+      <section className="hero" aria-hidden>
+        {images.map((img) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={img.src} src={img.src} alt="" />
+        ))}
+        <div className="hero-overlay">
+          <h1 className="display-xl">Series Books</h1>
+          <p className="caption" style={{ color: "var(--ink)" }}>
+            dchoi09 전집 · AI 상담
+          </p>
         </div>
-        <h1>
-          안녕하세요!
-          <br />
-          디초이 전집 상담 도우미예요
-        </h1>
-        <p className="muted">전집 추천, 가격, 구성, 배송·픽업 등 궁금한 점을 물어보세요. 시작하려면 이름과 이메일을 남겨 주세요.</p>
-        <div>
-          <label className="label" htmlFor="name">
-            이름
+      </section>
+      <div className="entry-body">
+        <h2 className="display-sm">상담 시작하기</h2>
+        <p className="lead" style={{ marginTop: 16 }}>
+          전집 추천, 가격, 구성, 배송·픽업까지. 이름과 이메일을 남기시면 바로 상담을 시작합니다.
+        </p>
+        <form className="entry-form" onSubmit={submit}>
+          <div>
+            <label className="label caption" htmlFor="name">
+              Name · 이름
+            </label>
+            <input id="name" className="input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required />
+          </div>
+          <div>
+            <label className="label caption" htmlFor="email">
+              Email · 이메일
+            </label>
+            <input
+              id="email"
+              type="email"
+              className="input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
+          </div>
+          <label className="check">
+            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+            <span>상담 품질 향상을 위해 이름, 이메일, 대화 내용이 저장되는 것에 동의합니다.</span>
           </label>
-          <input id="name" className="input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" required />
-        </div>
-        <div>
-          <label className="label" htmlFor="email">
-            이메일
-          </label>
-          <input
-            id="email"
-            type="email"
-            className="input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            required
-          />
-        </div>
-        <label className="consent">
-          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-          <span>상담 품질 향상을 위해 이름, 이메일, 대화 내용이 저장되는 것에 동의합니다.</span>
-        </label>
-        {(error || notice) && <p className="error">{error || notice}</p>}
-        <button className="btn btn-primary" disabled={busy}>
-          {busy ? "들어가는 중…" : "상담 시작하기"}
-        </button>
-      </form>
+          {(error || notice) && <p className="error">{error || notice}</p>}
+          <div>
+            <button className="btn" disabled={busy}>
+              {busy ? "Entering…" : "Start · 시작"}
+            </button>
+          </div>
+        </form>
+      </div>
     </main>
   );
 }
@@ -190,22 +214,20 @@ function Chat(props: {
 
   return (
     <main className="chat-shell">
-      <header className="chat-header">
-        <div className="avatar" aria-hidden>
-          D
-        </div>
-        <div style={{ flex: 1 }}>
-          <div className="chat-title">디초이 전집 상담</div>
-          <div className="chat-sub">{me.name}님 · 전집 상품 정보 기반 AI 상담</div>
-        </div>
-        <button className="btn btn-sm" onClick={onLeave}>
-          나가기
-        </button>
-      </header>
+      <nav className="top-nav">
+        <span className="nav-left caption">{me.name}님</span>
+        <span className="wordmark">DCHOI09</span>
+        <span className="nav-right">
+          <button className="nav-link" onClick={onLeave}>
+            <span className="hide-mobile">Exit · </span>나가기
+          </button>
+        </span>
+      </nav>
+      <p className="chat-sub caption">전집 상품 정보 기반 AI 상담</p>
 
       <div className="chat-body">
         <div className="bubble bubble-bot">
-          {me.name}님, 반가워요! 😊 dchoi09 전집에 대해 무엇이든 물어보세요.
+          {me.name}님, 반갑습니다. dchoi09 전집에 대해 무엇이든 물어보세요.
           {"\n"}아이 나이(개월 수)를 알려주시면 딱 맞는 전집을 추천해 드릴게요.
         </div>
         {messages.length === 0 && !blocked && (
@@ -238,6 +260,7 @@ function Chat(props: {
         <div ref={bottom} />
       </div>
 
+      <div className="chat-input-wrap">
       <form
         className="chat-input"
         onSubmit={(e) => {
@@ -246,19 +269,19 @@ function Chat(props: {
         }}
       >
         <textarea
-          className="textarea"
           rows={1}
-          placeholder={blocked ? "상담이 제한되었습니다." : "메시지를 입력하세요 (Enter 전송, Shift+Enter 줄바꿈)"}
+          placeholder={blocked ? "상담이 제한되었습니다." : "메시지를 입력하세요"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKey}
           disabled={blocked}
           maxLength={2000}
         />
-        <button className="btn btn-primary" disabled={sending || blocked || !input.trim()}>
-          보내기
+        <button className="btn" disabled={sending || blocked || !input.trim()}>
+          Send
         </button>
       </form>
+      </div>
     </main>
   );
 }

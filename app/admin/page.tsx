@@ -29,35 +29,40 @@ export default function AdminPage() {
       .catch(() => setState("login"));
   }, []);
 
-  if (state === "loading") return <div className="entry muted">불러오는 중…</div>;
+  if (state === "loading") return <div className="caption" style={{ padding: 40, textAlign: "center" }}>Loading…</div>;
   if (state === "login") return <Login onOk={() => setState("in")} />;
 
   return (
+    <>
+    <nav className="top-nav">
+      <a className="nav-left nav-link" href="/" target="_blank">
+        Chatbot ↗
+      </a>
+      <span className="wordmark">DCHOI09</span>
+      <span className="nav-right">
+        <button
+          className="nav-link"
+          onClick={async () => {
+            await fetch("/api/admin/login", { method: "DELETE" });
+            setState("login");
+          }}
+        >
+          Logout
+        </button>
+      </span>
+    </nav>
     <main className="admin">
-      <div className="admin-top">
-        <h1>디초이 챗봇 관리자</h1>
-        <div style={{ display: "flex", gap: 8 }}>
-          <a className="btn btn-sm" href="/" target="_blank">
-            챗봇 열기 ↗
-          </a>
-          <button
-            className="btn btn-sm"
-            onClick={async () => {
-              await fetch("/api/admin/login", { method: "DELETE" });
-              setState("login");
-            }}
-          >
-            로그아웃
-          </button>
-        </div>
+      <div className="admin-head">
+        <span className="caption">Admin Console</span>
+        <h1 className="display-lg">관리자</h1>
       </div>
       <nav className="tabs">
         {(
           [
-            ["logs", "대화 기록"],
-            ["qa", "질의응답"],
-            ["rules", "챗봇 규칙"],
-            ["products", "전집 상품(엑셀)"],
+            ["logs", "대화 기록 · Logs"],
+            ["qa", "질의응답 · Q&A"],
+            ["rules", "규칙 · Rules"],
+            ["products", "상품 · Excel"],
           ] as [Tab, string][]
         ).map(([k, label]) => (
           <button key={k} className={`tab ${tab === k ? "tab-active" : ""}`} onClick={() => setTab(k)}>
@@ -70,6 +75,7 @@ export default function AdminPage() {
       {tab === "rules" && <RulesPanel />}
       {tab === "products" && <ProductsPanel />}
     </main>
+    </>
   );
 }
 
@@ -86,17 +92,24 @@ function Login({ onOk }: { onOk: () => void }) {
     }
   }
   return (
-    <main className="entry">
-      <form className="entry-card" onSubmit={submit}>
-        <h1>관리자 로그인</h1>
+    <main className="entry-page">
+      <nav className="top-nav">
+        <span className="nav-left caption">Admin</span>
+        <span className="wordmark">DCHOI09</span>
+        <span />
+      </nav>
+      <form className="entry-body entry-form" onSubmit={submit}>
+        <h1 className="display-md">관리자 로그인</h1>
         <div>
-          <label className="label" htmlFor="pw">
-            비밀번호
+          <label className="label caption" htmlFor="pw">
+            Password · 비밀번호
           </label>
           <input id="pw" type="password" className="input" value={pw} onChange={(e) => setPw(e.target.value)} autoFocus />
         </div>
         {error && <p className="error">{error}</p>}
-        <button className="btn btn-primary">로그인</button>
+        <div>
+          <button className="btn">Login · 로그인</button>
+        </div>
       </form>
     </main>
   );
@@ -140,36 +153,38 @@ function Logs() {
 
   return (
     <>
-      {storage === "temp-file" && (
+      {storage === "temp" && (
         <div className="banner">
-          ⚠️ 저장소(Upstash Redis)가 연결되지 않아 대화 기록이 곧 사라질 수 있어요. 안내서의 &quot;Redis 연결&quot; 단계를 진행해 주세요.
+          GitHub 저장이 연결되지 않아 대화 기록이 곧 사라질 수 있어요. Vercel 환경변수에 GITHUB_TOKEN 과 GITHUB_REPO 를 넣어 주세요.
         </div>
       )}
+      {storage === "local" && <div className="notice">내 컴퓨터 테스트 모드: 대화 기록은 .data 폴더에 저장돼요 (GitHub에는 올라가지 않음).</div>}
+      {storage === "github" && <div className="notice">대화 기록은 GitHub 레포의 data/chats 폴더에 저장돼요.</div>}
       {error && <p className="error">{error}</p>}
       <div className="split">
-        <div className="card user-list">
-          <div style={{ padding: 12, borderBottom: "1px solid var(--line)", display: "flex", gap: 8 }}>
-            <input className="input" placeholder="이름·이메일 검색" value={q} onChange={(e) => setQ(e.target.value)} />
-            <button className="btn btn-sm" onClick={loadUsers} title="새로고침">
-              ↻
-            </button>
-          </div>
-          {filtered.length === 0 && <p className="muted" style={{ padding: 14 }}>아직 대화한 사용자가 없어요.</p>}
+        <div>
+        <div className="user-search">
+          <input className="input" placeholder="이름·이메일 검색" value={q} onChange={(e) => setQ(e.target.value)} />
+          <button className="btn btn-icon btn-quiet" onClick={loadUsers} title="새로고침">
+            ↻
+          </button>
+        </div>
+        <div className="user-list">
+          {filtered.length === 0 && <p className="muted" style={{ padding: "16px 8px" }}>아직 대화한 사용자가 없어요.</p>}
           {filtered.map((u) => (
             <button key={u.id} className={`user-item ${sel === u.id ? "user-item-active" : ""}`} onClick={() => loadDetail(u.id)}>
               <div className="user-item-name">{u.name}</div>
-              <div className="muted" style={{ fontSize: 13 }}>
-                {u.email}
-              </div>
+              <div className="muted body-sm">{u.email}</div>
               <div className="user-meta">
-                <span className="badge">{u.messageCount}개 질문</span>
+                <span className="badge">{u.messageCount} 질문</span>
                 {u.lastMood && <span className={`badge ${moodClass(u.lastMood)}`}>{u.lastMood}</span>}
                 {u.warnings > 0 && <span className="badge badge-warn">경고 {u.warnings}</span>}
                 {u.blocked && <span className="badge badge-danger">차단됨</span>}
-                <span className="muted">{fmt(u.lastActiveAt)}</span>
+                <span className="badge">{fmt(u.lastActiveAt)}</span>
               </div>
             </button>
           ))}
+        </div>
         </div>
 
         <div className="card">
@@ -179,7 +194,8 @@ function Logs() {
             <>
               <div className="toolbar" style={{ justifyContent: "space-between" }}>
                 <div>
-                  <strong>{detail.user.name}</strong> <span className="muted">{detail.user.email}</span>
+                  <div className="display-sm">{detail.user.name}</div>
+                  <span className="muted body-sm">{detail.user.email}</span>
                   <div className="user-meta">
                     <span className="badge">가입 {fmt(detail.user.createdAt)}</span>
                     <span className="badge badge-warn">경고 {detail.user.warnings}회</span>
@@ -209,7 +225,7 @@ function Logs() {
                   const newSession = i === 0 || detail.messages[i - 1].sessionId !== m.sessionId;
                   return (
                     <div key={m.id} style={{ display: "contents" }}>
-                      {newSession && <div className="session-sep">── 대화 시작 {fmt(m.createdAt)} ──</div>}
+                      {newSession && <div className="session-sep caption">Session · {fmt(m.createdAt)}</div>}
                       <div
                         className={`bubble ${m.role === "user" ? "bubble-user" : m.role === "warning" ? "bubble-warning" : "bubble-bot"}`}
                       >
@@ -274,12 +290,12 @@ function QAPanel() {
   }
 
   async function upload(file: File) {
-    if (!confirm("엑셀의 '질의응답' 시트 내용으로 지금 목록을 전부 바꿀까요?")) return;
+    if (!confirm("올린 엑셀 파일로 GitHub의 엑셀(상품 + 질의응답)을 통째로 바꿀까요?")) return;
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const d = await api<{ count: number }>("/api/admin/excel", { method: "POST", body: fd });
-      setMsg(`엑셀에서 ${d.count}개를 불러왔어요.`);
+      const d = await api<{ products: number; qa: number }>("/api/admin/excel", { method: "POST", body: fd });
+      setMsg(`엑셀 교체 완료: 상품 ${d.products}개, 질의응답 ${d.qa}개`);
       load();
     } catch (err) {
       setMsg((err as Error).message);
@@ -291,13 +307,14 @@ function QAPanel() {
 
   return (
     <>
-      <p className="muted" style={{ marginBottom: 12 }}>
-        챗봇은 여기 있는 답변을 상품 정보보다 먼저 따릅니다. 저장 즉시 챗봇에 반영돼요.
-      </p>
+      <div className="notice">
+        질의응답은 GitHub의 엑셀(data/jeonjip.xlsx) 질의응답 시트에 저장되고, 저장 즉시 챗봇에 반영돼요. 챗봇은 이 답변을 상품 정보보다
+        먼저 따릅니다.
+      </div>
       <div className="toolbar">
         <input className="input" placeholder="검색" value={q} onChange={(e) => setQ(e.target.value)} />
         <button
-          className="btn btn-primary"
+          className="btn btn-sm"
           onClick={() => {
             setForm(emptyQA);
             setOpen(true);
@@ -305,10 +322,10 @@ function QAPanel() {
         >
           + 새 질의응답
         </button>
-        <a className="btn" href="/api/admin/excel">
+        <a className="btn btn-sm btn-quiet" href="/api/admin/excel">
           엑셀 내려받기
         </a>
-        <label className="btn">
+        <label className="btn btn-sm btn-quiet">
           엑셀 올리기
           <input
             type="file"
@@ -326,33 +343,33 @@ function QAPanel() {
       </div>
 
       {open && (
-        <form className="card form-grid" style={{ marginBottom: 16 }} onSubmit={save}>
+        <form className="card form-grid" onSubmit={save}>
           <div className="full">
-            <label className="label">질문</label>
+            <label className="label caption">Question · 질문</label>
             <input className="input" value={form.question} onChange={set("question")} required />
           </div>
           <div className="full">
-            <label className="label">답변</label>
+            <label className="label caption">Answer · 답변</label>
             <textarea className="textarea" value={form.answer} onChange={set("answer")} required rows={5} />
           </div>
           <div>
-            <label className="label">분류 (예: 배송, 결제)</label>
+            <label className="label caption">Category · 분류</label>
             <input className="input" value={form.category} onChange={set("category")} />
           </div>
           <div>
-            <label className="label">관련 상품명 (선택)</label>
+            <label className="label caption">Product · 관련 상품 (선택)</label>
             <input className="input" value={form.product} onChange={set("product")} />
           </div>
           <div className="full" style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-primary">{form.id ? "수정 저장" : "추가"}</button>
-            <button type="button" className="btn" onClick={() => setOpen(false)}>
+            <button className="btn">{form.id ? "수정 저장" : "추가"}</button>
+            <button type="button" className="btn btn-quiet" onClick={() => setOpen(false)}>
               취소
             </button>
           </div>
         </form>
       )}
 
-      <div className="card table-wrap">
+      <div className="table-wrap">
         <table>
           <thead>
             <tr>
@@ -369,7 +386,7 @@ function QAPanel() {
               <tr key={x.id}>
                 <td>{x.category && <span className="badge">{x.category}</span>}</td>
                 <td style={{ minWidth: 180 }}>
-                  <strong>{x.question}</strong>
+                  <span className="q">{x.question}</span>
                 </td>
                 <td className="pre" style={{ minWidth: 280 }}>
                   {x.answer}
@@ -380,7 +397,7 @@ function QAPanel() {
                 </td>
                 <td style={{ whiteSpace: "nowrap" }}>
                   <button
-                    className="btn btn-sm"
+                    className="btn btn-sm btn-quiet"
                     onClick={() => {
                       setForm({ id: x.id, question: x.question, answer: x.answer, category: x.category, product: x.product });
                       setOpen(true);
@@ -432,26 +449,25 @@ function RulesPanel() {
   }
 
   return (
-    <div className="card">
+    <div>
+      <div className="notice">규칙은 GitHub 레포의 data/rules.json 에 저장되고, 저장하면 다음 대화부터 바로 적용돼요.</div>
       {RULE_INFO.map(([k, title, desc]) => (
         <div className="rule-block" key={k}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <div className="rule-head">
             <div>
-              <h3>{title}</h3>
-              <span className="muted" style={{ fontSize: 13 }}>
-                {desc}
-              </span>
+              <h3 className="title-md">{title}</h3>
+              <span className="muted body-sm">{desc}</span>
             </div>
-            <button className="btn btn-sm" onClick={() => setRules({ ...rules, [k]: defaults[k] })}>
+            <button className="btn btn-sm btn-quiet" onClick={() => setRules({ ...rules, [k]: defaults[k] })}>
               기본값으로
             </button>
           </div>
           <textarea className="textarea" value={rules[k]} onChange={(e) => setRules({ ...rules, [k]: e.target.value })} />
         </div>
       ))}
-      <div className="toolbar">
-        <button className="btn btn-primary" onClick={save}>
-          규칙 저장
+      <div className="toolbar" style={{ marginTop: 40 }}>
+        <button className="btn" onClick={save}>
+          Save · 규칙 저장
         </button>
         {msg && <span className="badge badge-ok">{msg}</span>}
         {!msg && rules.updatedAt && <span className="muted">마지막 저장: {fmt(rules.updatedAt)}</span>}
@@ -479,10 +495,10 @@ function ProductsPanel() {
 
   return (
     <>
-      <p className="muted" style={{ marginBottom: 12 }}>
-        챗봇이 학습한 엑셀(data/jeonjip.xlsx)의 상품 목록이에요. 상품 정보를 새로 받으려면 내 컴퓨터에서 <code>npm run crawl</code> 후 GitHub에
-        올리면 됩니다.
-      </p>
+      <div className="notice">
+        챗봇이 읽는 GitHub의 엑셀(data/jeonjip.xlsx) 상품 목록이에요. 상품 정보를 새로 받으려면 내 컴퓨터에서 <code>npm run crawl</code> 을
+        실행하면 GitHub의 엑셀까지 자동으로 바뀝니다.
+      </div>
       <div className="toolbar">
         <input className="input" placeholder="상품명·브랜드·태그 검색" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="input" style={{ maxWidth: 160 }} value={age} onChange={(e) => setAge(e.target.value)}>
@@ -491,14 +507,14 @@ function ProductsPanel() {
             <option key={a}>{a}</option>
           ))}
         </select>
-        <a className="btn" href="/api/admin/excel">
+        <a className="btn btn-sm btn-quiet" href="/api/admin/excel">
           엑셀 내려받기
         </a>
-        <span className="muted">
-          {filtered.length} / {products.length}개
+        <span className="badge">
+          {filtered.length} / {products.length}
         </span>
       </div>
-      <div className="card table-wrap">
+      <div className="table-wrap">
         <table>
           <thead>
             <tr>
@@ -523,14 +539,14 @@ function ProductsPanel() {
                 <td>{p.ages.join(", ")}</td>
                 <td>
                   {usd(p.shipPrice)}
-                  {p.shipCompare && p.shipCompare > (p.shipPrice ?? 0) ? <div className="muted"><s>{usd(p.shipCompare)}</s></div> : null}
+                  {p.shipCompare && p.shipCompare > (p.shipPrice ?? 0) ? <div className="price-old">{usd(p.shipCompare)}</div> : null}
                 </td>
                 <td>{usd(p.pickupPrice)}</td>
                 <td>{p.available ? <span className="badge badge-ok">판매중</span> : <span className="badge badge-danger">품절</span>}</td>
                 <td>
                   {p.detail ? (
                     <>
-                      <button className="btn btn-sm" onClick={() => setOpenId(openId === p.id ? null : p.id)}>
+                      <button className="btn btn-sm btn-quiet" onClick={() => setOpenId(openId === p.id ? null : p.id)}>
                         {openId === p.id ? "접기" : "보기"}
                       </button>
                       {openId === p.id && <div className="detail-text" style={{ marginTop: 8 }}>{p.detail}</div>}

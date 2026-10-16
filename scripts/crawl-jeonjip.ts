@@ -5,7 +5,13 @@
  * 실행:  npm run crawl
  *
  * 이미 엑셀에 있는 "질의응답" 시트는 지우지 않고 그대로 유지합니다.
+ * .env 에 GITHUB_TOKEN 이 있으면 GitHub의 엑셀에서 질의응답을 가져오고, 새 엑셀을 GitHub에도 바로 올립니다.
  */
+try {
+  process.loadEnvFile(".env");
+} catch {
+  /* .env 없으면 그냥 진행 */
+}
 
 import fs from "node:fs";
 import path from "node:path";
@@ -189,17 +195,23 @@ async function main() {
   }
   console.log("");
 
-  // 기존 엑셀의 질의응답은 유지
+  // 기존 엑셀의 질의응답은 유지 (GitHub 연결 시 GitHub의 최신 엑셀 기준)
+  const { readFile, storageKind, updateFile } = await import("../lib/storage");
   let qa: QAItem[] = starterQA();
-  if (fs.existsSync(EXCEL_PATH)) {
-    const existing = await readWorkbook(fs.readFileSync(EXCEL_PATH));
-    if (existing.qa.length) qa = existing.qa;
+  const existing = await readFile("data/jeonjip.xlsx");
+  if (existing) {
+    const parsed = await readWorkbook(existing.data);
+    if (parsed.qa.length) qa = parsed.qa;
   }
 
   fs.mkdirSync(path.dirname(EXCEL_PATH), { recursive: true });
   const buf = await writeWorkbook(result, qa);
   fs.writeFileSync(EXCEL_PATH, buf);
   console.log(`4) 저장 완료: ${EXCEL_PATH}`);
+  if (storageKind === "github") {
+    await updateFile("data/jeonjip.xlsx", "크롤러: 전집 상품 정보 업데이트", () => buf);
+    console.log("   GitHub의 엑셀도 새 내용으로 바꿨어요. (챗봇에 1분 안에 반영)");
+  }
   console.log(`   상품 ${result.length}개 / 질의응답 ${qa.length}개`);
 }
 
