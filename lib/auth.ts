@@ -24,15 +24,28 @@ function verify(signed: string | undefined): string | null {
 }
 
 // ---------- 채팅 사용자 ----------
-export function chatCookieValue(userId: string, sessionId: string) {
-  return sign(`${userId}:${sessionId}`);
+// 쿠키에 이름/이메일도 함께 담아 둡니다. 저장소에서 사용자 기록이 사라져도 다시 만들 수 있게요.
+export interface ChatCookie {
+  userId: string;
+  sessionId: string;
+  name: string;
+  email: string;
 }
 
-export function readChatCookie(req: NextRequest): { userId: string; sessionId: string } | null {
+export function chatCookieValue(c: ChatCookie) {
+  return sign(Buffer.from(JSON.stringify(c)).toString("base64url"));
+}
+
+export function readChatCookie(req: NextRequest): ChatCookie | null {
   const v = verify(req.cookies.get(CHAT_COOKIE)?.value);
   if (!v) return null;
-  const [userId, sessionId] = v.split(":");
-  return userId && sessionId ? { userId, sessionId } : null;
+  try {
+    const c = JSON.parse(Buffer.from(v, "base64url").toString("utf-8")) as Partial<ChatCookie>;
+    if (!c.userId || !c.sessionId || !c.email) return null;
+    return { userId: c.userId, sessionId: c.sessionId, name: c.name ?? "", email: c.email };
+  } catch {
+    return null; // 예전 형식 쿠키 → 다시 입장
+  }
 }
 
 // ---------- 관리자 ----------

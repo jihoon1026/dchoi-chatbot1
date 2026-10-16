@@ -2,14 +2,14 @@
 import type { NextRequest } from "next/server";
 import { CHAT_COOKIE, chatCookieValue, cookieOptions, readChatCookie } from "@/lib/auth";
 import { BLOCKED_TEXT } from "@/lib/constants";
-import { findOrCreateUser, getMessages, getUser, newId } from "@/lib/store";
+import { findOrCreateUser, getMessages, getOrRestoreUser, newId } from "@/lib/store";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export async function GET(req: NextRequest) {
   const c = readChatCookie(req);
-  const user = c ? await getUser(c.userId) : null;
-  if (!c || !user) return Response.json({ user: null });
+  if (!c) return Response.json({ user: null });
+  const user = await getOrRestoreUser(c);
   const messages = (await getMessages(user.id))
     .filter((m) => m.sessionId === c.sessionId)
     .map(({ id, role, content, createdAt }) => ({ id, role, content, createdAt }));
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   // 새 입장마다 새 대화(세션)로 시작합니다. 이전 대화는 관리자 페이지에서 볼 수 있어요.
   res.headers.append(
     "Set-Cookie",
-    `${CHAT_COOKIE}=${chatCookieValue(user.id, newId())}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${cookieOptions.secure ? "; Secure" : ""}`,
+    `${CHAT_COOKIE}=${chatCookieValue({ userId: user.id, sessionId: newId(), name: user.name, email: user.email })}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${cookieOptions.secure ? "; Secure" : ""}`,
   );
   return res;
 }

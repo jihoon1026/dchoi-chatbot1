@@ -2,7 +2,7 @@
 import type { NextRequest } from "next/server";
 import { analyzeMessage, describeApiError, generateReply } from "@/lib/ai";
 import { readChatCookie } from "@/lib/auth";
-import { addMessage, getMessages, getQA, getRules, getUser, newId, saveUser, type StoredMessage } from "@/lib/store";
+import { addMessage, getMessages, getOrRestoreUser, getQA, getRules, newId, saveUser, type StoredMessage } from "@/lib/store";
 import { BLOCKED_TEXT } from "@/lib/constants";
 
 export const maxDuration = 60; // Vercel에서 AI 답변을 기다리는 최대 시간(초)
@@ -11,8 +11,8 @@ const HISTORY_LIMIT = 30;
 
 export async function POST(req: NextRequest) {
   const c = readChatCookie(req);
-  const user = c ? await getUser(c.userId) : null;
-  if (!c || !user) return Response.json({ error: "먼저 이름과 이메일을 입력해 주세요." }, { status: 401 });
+  if (!c) return Response.json({ error: "먼저 이름과 이메일을 입력해 주세요.", needEntry: true }, { status: 401 });
+  const user = await getOrRestoreUser(c);
   if (user.blocked) return Response.json({ blocked: true, warning: BLOCKED_TEXT });
   if (!process.env.ANTHROPIC_API_KEY) {
     return Response.json({ error: "챗봇 준비 중이에요. (운영자: .env 또는 Vercel 환경변수에 ANTHROPIC_API_KEY 를 넣어 주세요)" }, { status: 503 });

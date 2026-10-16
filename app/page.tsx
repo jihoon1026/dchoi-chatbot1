@@ -18,6 +18,7 @@ export default function ChatPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [blockedText, setBlockedText] = useState<string>();
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     fetch("/api/session")
@@ -36,7 +37,9 @@ export default function ChatPage() {
   if (!me)
     return (
       <Entry
+        notice={notice}
         onEnter={(d) => {
+          setNotice("");
           setMe(d.user);
           setMessages([]);
           setBlockedText(d.blockedText);
@@ -50,6 +53,11 @@ export default function ChatPage() {
       setMessages={setMessages}
       blockedText={blockedText}
       setBlockedText={setBlockedText}
+      onExpired={() => {
+        setMe(null);
+        setMessages([]);
+        setNotice("입장 정보가 만료되었어요. 이름과 이메일을 다시 입력해 주세요.");
+      }}
       onLeave={async () => {
         await fetch("/api/session", { method: "DELETE" });
         setMe(null);
@@ -59,7 +67,7 @@ export default function ChatPage() {
   );
 }
 
-function Entry({ onEnter }: { onEnter: (d: { user: Me; blockedText?: string }) => void }) {
+function Entry({ onEnter, notice }: { onEnter: (d: { user: Me; blockedText?: string }) => void; notice?: string }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [agree, setAgree] = useState(false);
@@ -118,7 +126,7 @@ function Entry({ onEnter }: { onEnter: (d: { user: Me; blockedText?: string }) =
           <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
           <span>상담 품질 향상을 위해 이름, 이메일, 대화 내용이 저장되는 것에 동의합니다.</span>
         </label>
-        {error && <p className="error">{error}</p>}
+        {(error || notice) && <p className="error">{error || notice}</p>}
         <button className="btn btn-primary" disabled={busy}>
           {busy ? "들어가는 중…" : "상담 시작하기"}
         </button>
@@ -134,8 +142,9 @@ function Chat(props: {
   blockedText?: string;
   setBlockedText: (t: string) => void;
   onLeave: () => void;
+  onExpired: () => void;
 }) {
-  const { me, messages, setMessages, blockedText, setBlockedText, onLeave } = props;
+  const { me, messages, setMessages, blockedText, setBlockedText, onLeave, onExpired } = props;
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
@@ -158,6 +167,7 @@ function Chat(props: {
         body: JSON.stringify({ message: t }),
       });
       const d = await r.json();
+      if (d.needEntry) return onExpired();
       const add: Msg[] = [];
       if (d.warning) add.push({ id: crypto.randomUUID(), role: "warning", content: d.warning });
       if (d.reply) add.push({ id: crypto.randomUUID(), role: "assistant", content: d.reply });

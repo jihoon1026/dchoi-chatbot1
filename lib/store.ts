@@ -53,6 +53,31 @@ export async function findOrCreateUser(name: string, email: string): Promise<Cha
   return u;
 }
 
+/** 쿠키의 사용자를 찾고, 저장소에서 사라졌으면 쿠키 정보(이름/이메일)로 다시 만듭니다. */
+export async function getOrRestoreUser(c: { userId: string; name: string; email: string }): Promise<ChatUser> {
+  const found = await getUser(c.userId);
+  if (found) return found;
+  // 같은 이메일로 저장된 기록이 있으면 그 사람으로 이어갑니다 (경고/차단 유지).
+  const byEmail = await kv.hget("emails", c.email);
+  if (byEmail) {
+    const u = await getUser(byEmail);
+    if (u) return u;
+  }
+  const u: ChatUser = {
+    id: c.userId,
+    name: c.name || c.email.split("@")[0],
+    email: c.email,
+    createdAt: now(),
+    lastActiveAt: now(),
+    warnings: 0,
+    blocked: false,
+    messageCount: 0,
+  };
+  await saveUser(u);
+  await kv.hset("emails", c.email, u.id);
+  return u;
+}
+
 // ---------- 대화 ----------
 export interface StoredMessage extends ChatMessage {
   sessionId: string;
